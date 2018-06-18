@@ -15,13 +15,19 @@ import sys
 import numpy as np
 
 class DCGAN():
-    def __init__(self):
+    def __init__(self, X_train=None, latent_dim=100):
         # Input shape
-        self.img_rows = 28
-        self.img_cols = 28
-        self.channels = 1
+        self.X_train = X_train
+        if self.X_train is not None:
+            _, img_rows, img_cols, channels = X_train.shape
+        else:
+            img_rows, img_cols, channels = 28, 28, 1
+        
+        self.img_rows = img_rows
+        self.img_cols = img_cols
+        self.channels = channels
         self.img_shape = (self.img_rows, self.img_cols, self.channels)
-        self.latent_dim = 100
+        self.latent_dim = latent_dim
 
         optimizer = Adam(0.0002, 0.5)
 
@@ -103,14 +109,17 @@ class DCGAN():
 
         return Model(img, validity)
 
-    def train(self, epochs, batch_size=128, save_interval=50):
+    def train(self, epochs, batch_size=128, save_interval=None, display_interval=10):
 
-        # Load the dataset
-        (X_train, _), (_, _) = mnist.load_data()
+        # Load MNIST dataset if input is None
+        if self.X_train is None:
+            (X_train, _), (_, _) = mnist.load_data()
 
-        # Rescale -1 to 1
-        X_train = X_train / 127.5 - 1.
-        X_train = np.expand_dims(X_train, axis=3)
+            # Rescale -1 to 1
+            X_train = X_train / 127.5 - 1.
+            X_train = np.expand_dims(X_train, axis=3)
+        else:
+            X_train = self.X_train
 
         # Adversarial ground truths
         valid = np.ones((batch_size, 1))
@@ -143,8 +152,13 @@ class DCGAN():
             g_loss = self.combined.train_on_batch(noise, valid)
 
             # Plot the progress
-            print ("%d [D loss: %f, acc.: %.2f%%] [G loss: %f]" % (epoch, d_loss[0], 100*d_loss[1], g_loss))
+            if epoch % display_interval == 0:
+                print ("%d [D loss: %f, acc.: %.2f%%] [G loss: %f]" % (epoch, d_loss[0], 100*d_loss[1], g_loss))
 
+            # If save_interval is None, do not save image
+            if save_interval is None:
+                continue
+            
             # If at save interval => save generated image samples
             if epoch % save_interval == 0:
                 self.save_imgs(epoch)
